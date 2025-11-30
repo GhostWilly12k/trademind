@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Set your base font here if you like, otherwise remove */
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Force Dark Mode colors since your Dashboard is dark */
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #0F123B; /* Matches your dashboard background */
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  /* REMOVED: display: flex */
+  /* REMOVED: place-items: center */
+  overflow-x: hidden; /* Prevents accidental horizontal scroll */
+}
+
+/* Ensure the React Root also takes up full space */
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Scrollbar Styling (Optional but looks good with your theme) */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0F123B; 
+}
+::-webkit-scrollbar-thumb {
+  background: #2d3748; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #4a5568; 
+}
