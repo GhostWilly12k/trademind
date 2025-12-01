@@ -65,11 +65,40 @@ export const api = {
     },
     watchlist: {
       async list() {
-        const { data, error } = await supabase.from('watchlist').select('*');
+        const { data, error } = await supabase
+          .from('watchlist')
+          .select('*')
+          .order('created_at', { ascending: false });
         if (error) throw error;
         return data;
+      },
+      async create(itemData) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data, error } = await supabase
+          .from('watchlist')
+          .insert([{ ...itemData, user_id: user.id }])
+          .select();
+        if (error) throw error;
+        return data[0];
+      },
+      async update(id, updates) {
+        const { data, error } = await supabase
+          .from('watchlist')
+          .update(updates)
+          .eq('id', id)
+          .select();
+        if (error) throw error;
+        return data[0];
+      },
+      async delete(id) {
+        const { error } = await supabase
+          .from('watchlist')
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
+        return true;
       }
-    }
+    },
   },
   integrations: {
     // Replacement for InvokeLLM using Supabase Edge Functions

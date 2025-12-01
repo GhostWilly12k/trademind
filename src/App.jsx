@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import TradeLog from './pages/TradeLog';
 import Analytics from './pages/Analytics';
 import AIInsights from './pages/AIInsights';
+import Watchlist from './pages/Watchlist';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
       {/* Protected Routes (Wrapped in your Layout) */}
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/watchlist" element={<Watchlist />} />
         <Route path="/tradelog" element={<TradeLog />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/ai-insights" element={<AIInsights />} />

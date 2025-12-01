@@ -6,7 +6,8 @@ import {
   TrendingUp,
   Brain,
   User,
-  LogOut
+  LogOut,
+  Eye
 } from "lucide-react";
 import {
   Sidebar,
@@ -30,6 +31,11 @@ const navigationItems = [
     title: "Dashboard",
     url: "/",
     icon: LayoutDashboard,
+  },
+  {
+    title: "WatchList",
+    url: "/watchlist",
+    icon: Eye,
   },
   {
     title: "Trade Log",
