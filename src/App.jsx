@@ -6,7 +6,7 @@ import Dashboard from './pages/Dashboard'
 import TradeLog from './pages/TradeLog';
 import Analytics from './pages/Analytics';
 import AIInsights from './pages/AIInsights';
-import Watchlist from './pages/Watchlist';
+import Watchlist from './pages/TradePlanner';
 
 function App() {
   return (

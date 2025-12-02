@@ -10,4 +10,13 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      '/api-tiingo': {
+        target: 'https://api.tiingo.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-tiingo/, ''),
+      },
+    },
+  },
 })

@@ -7,7 +7,8 @@ import {
   Brain,
   User,
   LogOut,
-  Eye
+  Eye,
+  NotebookText
 } from "lucide-react";
 import {
   Sidebar,
@@ -33,9 +34,9 @@ const navigationItems = [
     icon: LayoutDashboard,
   },
   {
-    title: "WatchList",
+    title: "Trade Planner",
     url: "/watchlist",
-    icon: Eye,
+    icon: NotebookText,
   },
   {
     title: "Trade Log",
