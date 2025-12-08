@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Environment variables from your .env file
+// Environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
@@ -26,7 +26,6 @@ export const api = {
   entities: {
     trade: {
       async list() {
-        // Equivalent to base44.entities.Trade.list()
         const { data, error } = await supabase
           .from('trades')
           .select('*')
@@ -35,7 +34,6 @@ export const api = {
         return data;
       },
       async create(tradeData) {
-        // Get current user ID first
         const { data: { user } } = await supabase.auth.getUser();
         
         const { data, error } = await supabase
@@ -101,13 +99,64 @@ export const api = {
     },
   },
   integrations: {
-    // Replacement for InvokeLLM using Supabase Edge Functions
-    async invokeAIAnalysis(prompt, contextData) {
-      const { data, error } = await supabase.functions.invoke('analyze-trade', {
-        body: { prompt, contextData }
+    // NEW: List available models from Edge Function
+    async listModels() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || supabaseAnonKey;
+      
+      try {
+        const response = await fetch(`${supabaseUrl}/functions/v1/analyze-trade`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ action: 'list_models' })
+        });
+        
+        if (!response.ok) return ['gemini-pro']; // Fallback if offline
+        const data = await response.json();
+        return data.models || ['gemini-pro'];
+      } catch (err) {
+        console.warn("Model list fetch failed", err);
+        return ['gemini-pro'];
+      }
+    },
+
+    // FIXED: Manual fetch implementation for total control over Body/Headers
+    async invokeAIAnalysis(prompt, contextData, model = 'gemini-pro') {
+      // 1. Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || supabaseAnonKey;
+
+      // 2. Construct URL
+      const functionUrl = `${supabaseUrl}/functions/v1/analyze-trade`;
+
+      // 3. Manual Fetch
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        // IMPORTANT: Flatten the structure so Edge Function gets { trades, watchlist } at root
+        body: JSON.stringify({
+          trades: contextData.trades || [],
+          watchlist: contextData.watchlist || "",
+          model: model // Pass selected model
+        })
       });
-      if (error) throw error;
-      return data;
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Edge Function Failed:", errorText);
+        // Try to parse JSON error if possible
+        try {
+           const jsonError = JSON.parse(errorText);
+           throw new Error(jsonError.error || "AI Analysis Failed");
+        } catch (e) {
+           throw new Error(`AI Analysis Failed: ${response.statusText}`);
+        }
+      }
+
+      return await response.json();
     }
   }
 };

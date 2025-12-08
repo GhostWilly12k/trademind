@@ -16,8 +16,10 @@ export default function AIInsights() {
   const [activeTab, setActiveTab] = useState("swot");
   const [insights, setInsights] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Hardcoded Model: Gemini 2.5 Flash
+  const selectedModel = 'gemini-2.5-flash-preview-09-2025';
 
-  // FIX: Replaced base44 with api client
   const { data: trades = [] } = useQuery({
     queryKey: ['trades'],
     queryFn: () => api.entities.trade.list()
@@ -35,7 +37,8 @@ export default function AIInsights() {
       
       const result = await api.integrations.invokeAIAnalysis(
         "Generate comprehensive trading insights",
-        { trades, watchlist: watchlistSymbols }
+        { trades, watchlist: watchlistSymbols },
+        selectedModel
       );
 
       if (result) {
@@ -50,17 +53,21 @@ export default function AIInsights() {
 
   if (!insights) {
     return (
-      // FIX: Added min-h-screen and padding to force full viewport height and spacing
       <div className="p-4 md:p-8 min-h-screen w-full space-y-6">
-        <div className="mb-8 pt-2">
-          <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 tracking-tight">
-            AI Trading Assistant
-          </h1>
-          <p className="text-gray-500">Your personalized AI that learns from every trade</p>
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pt-2">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2 tracking-tight">
+              AI Trading Assistant
+            </h1>
+            <p className="text-gray-500">Your personalized AI that learns from every trade</p>
+          </div>
+          {/* No selector needed anymore */}
         </div>
 
         <Card className="glass-card border-none w-full">
           <CardContent className="text-center p-12">
+            <div className="max-w-2xl mx-auto">
               <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center shadow-2xl relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #0075FF 0%, #00C9FF 100%)', boxShadow: '0 0 60px rgba(0, 117, 255, 0.6), 0 0 100px rgba(0, 201, 255, 0.4)' }}>
                 <Brain className="w-12 h-12 text-white relative z-10" strokeWidth={2.5} />
                 <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/20 to-transparent animate-pulse" />
@@ -69,9 +76,8 @@ export default function AIInsights() {
                 Activate Your AI Trading Assistant
               </h2>
               <p className="text-gray-400 text-lg mb-8 leading-relaxed">
-                Experience the power of an AI that adapts to your trading style, masters your technical analysis techniques, 
-                generates real-time signals for your watchlist, and provides comprehensive SWOT analysis of your strategies. 
-                The more you trade, the smarter it becomes.
+                Using <strong>Gemini 2.5 Flash</strong> to analyze your trading style, master your technical analysis techniques, 
+                generate real-time signals, and provide comprehensive SWOT analysis.
               </p>
 
               <div className="grid md:grid-cols-3 gap-4 mb-8 text-left">
@@ -99,12 +105,12 @@ export default function AIInsights() {
                 {isGenerating ?
                 <>
                     <Loader2 className="w-6 h-6 mr-3 animate-spin" />
-                    Analyzing Your Trading Data...
+                    Running Analysis...
                   </> :
 
                 <>
                     <Sparkles className="w-6 h-6 mr-3 group-hover:rotate-12 transition-transform" />
-                    Activate AI Assistant
+                    Generate Insights
                   </>
                 }
               </Button>
@@ -114,6 +120,7 @@ export default function AIInsights() {
                   You need to log some trades first for the AI to analyze your trading style
                 </p>
               }
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -121,7 +128,6 @@ export default function AIInsights() {
   }
 
   return (
-    // FIX: Added min-h-screen and padding to force full viewport height and spacing
     <div className="p-4 md:p-8 min-h-screen w-full space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -129,26 +135,29 @@ export default function AIInsights() {
             <Brain className="w-10 h-10 text-[#00D9A3]" />
             AI Trading Assistant
           </h1>
-          <p className="text-gray-500">Comprehensive analysis powered by artificial intelligence</p>
+          <p className="text-gray-500">Comprehensive analysis powered by Gemini 2.5 Flash</p>
         </div>
-        <Button
-          onClick={generateComprehensiveInsights}
-          disabled={isGenerating}
-          variant="outline" 
-          className="bg-background text-zinc-600 px-4 py-2 text-sm font-medium rounded-md inline-flex items-center justify-center gap-2 whitespace-nowrap focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border shadow-sm h-9 border-[#2D2D2D] hover:bg-[#252525] hover:text-white hover:border-[#374151] transition-all"
-        >
-          {isGenerating ?
-          <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Regenerating...
-            </> :
+        
+        <div className="flex items-center gap-2">
+            <Button
+                onClick={generateComprehensiveInsights}
+                disabled={isGenerating}
+                variant="outline" 
+                className="bg-background text-zinc-600 px-4 py-2 text-sm font-medium rounded-md inline-flex items-center justify-center gap-2 whitespace-nowrap focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border shadow-sm h-9 border-[#2D2D2D] hover:bg-[#252525] hover:text-white hover:border-[#374151] transition-all"
+            >
+                {isGenerating ?
+                <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Regenerating...
+                </> :
 
-          <>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh Analysis
-            </>
-          }
-        </Button>
+                <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh Analysis
+                </>
+                }
+            </Button>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">

@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Brain,
@@ -12,48 +11,29 @@ import {
   Target,
   Loader2,
   Play,
-  RefreshCw,
   HelpCircle,
-  Zap
+  Zap,
+  RotateCcw
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, ReferenceLine } from 'recharts';
 import { motion, AnimatePresence } from "framer-motion";
+import { useMutation } from "@tanstack/react-query";
+import { SimulationService } from "@/api/simulationService";
+import { Label } from "@/components/ui/label";
 
-// Monte Carlo Histogram
-function SimulationHistogram({ distribution }) {
-  if (!distribution || distribution.length === 0) return null;
-  
-  return (
-    <ResponsiveContainer width="100%" height={120}>
-      <BarChart data={distribution} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
-        <XAxis 
-          dataKey="range" 
-          tick={{ fill: '#A0AEC0', fontSize: 10 }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis hide />
-        <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-          {distribution.map((entry, index) => (
-            <Cell 
-              key={`cell-${index}`} 
-              fill={entry.range?.includes('-') ? '#ef4444' : '#00C9FF'}
-              fillOpacity={0.8}
-            />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
+const COLORS = {
+  best: "#22c55e",   // Green
+  median: "#3b82f6", // Blue
+  worst: "#ef4444"   // Red
+};
 
 // Simulation Result Card
 function ResultCard({ label, value, subtext, color, icon: Icon }) {
   return (
-    <div className="p-4 rounded-xl bg-white/5 text-center">
+    <div className="p-4 rounded-xl bg-white/5 text-center border border-white/5">
       <div className="flex items-center justify-center gap-2 mb-1">
         {Icon && <Icon className={`w-4 h-4 ${color}`} />}
-        <p className="text-xs text-[#A0AEC0]">{label}</p>
+        <p className="text-xs text-[#A0AEC0] uppercase font-bold tracking-wider">{label}</p>
       </div>
       <p className={`text-2xl font-bold ${color}`}>{value}</p>
       {subtext && <p className="text-xs text-[#A0AEC0] mt-1">{subtext}</p>}
@@ -61,72 +41,69 @@ function ResultCard({ label, value, subtext, color, icon: Icon }) {
   );
 }
 
-export default function PredictiveModel({ predictions, onRunSimulation }) {
-  const [volatilityMultiplier, setVolatilityMultiplier] = useState([1.0]);
-  const [stopLossWidth, setStopLossWidth] = useState([2.0]);
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [simulationProgress, setSimulationProgress] = useState(0);
-  const [simulationResults, setSimulationResults] = useState(null);
+export default function PredictiveModel() {
+  // Default Params (Matches Python Backend Requirements)
+  const [params, setParams] = useState({
+    starting_equity: 10000,
+    win_rate: 55,       // %
+    avg_win: 200,       // $
+    avg_loss: 100,      // $
+    risk_per_trade: 2.0, // %
+    num_trades: 50,
+    num_simulations: 1000
+  });
 
-  // Simulated Monte Carlo (in production, this streams from the Quant agent)
-  const runSimulation = async () => {
-    setIsSimulating(true);
-    setSimulationProgress(0);
-    
-    // Simulate streaming progress
-    const interval = setInterval(() => {
-      setSimulationProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-        return prev + Math.random() * 15;
-      });
-    }, 100);
+  const [results, setResults] = useState(null);
 
-    // Simulate 1000 iterations result
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const baseWinRate = 0.55;
-    const volAdjustment = (volatilityMultiplier[0] - 1) * -0.1;
-    const slAdjustment = (stopLossWidth[0] - 2) * 0.02;
-    const adjustedWinRate = Math.min(0.85, Math.max(0.25, baseWinRate + volAdjustment + slAdjustment));
+  // Connect to Python Backend
+  const mutation = useMutation({
+    mutationFn: (data) => SimulationService.runSimulation(data),
+    onSuccess: (data) => setResults(data),
+    onError: (err) => console.error("Sim Failed", err)
+  });
 
-    setSimulationResults({
-      win_probability: adjustedWinRate * 100,
-      expected_value: (adjustedWinRate * 150 - (1 - adjustedWinRate) * 100).toFixed(2),
-      risk_of_ruin: Math.max(0.5, (1 - adjustedWinRate) * 20).toFixed(1),
-      kelly_size: (adjustedWinRate - (1 - adjustedWinRate) / 1.5).toFixed(2),
-      iterations: 1000,
-      distribution: [
-        { range: '-50%', count: Math.floor((1 - adjustedWinRate) * 150) },
-        { range: '-25%', count: Math.floor((1 - adjustedWinRate) * 200) },
-        { range: '0%', count: 100 },
-        { range: '+25%', count: Math.floor(adjustedWinRate * 200) },
-        { range: '+50%', count: Math.floor(adjustedWinRate * 150) },
-        { range: '+100%', count: Math.floor(adjustedWinRate * 80) },
-      ]
-    });
-    
-    clearInterval(interval);
-    setSimulationProgress(100);
-    setIsSimulating(false);
-    
-    onRunSimulation?.({
-      volatility: volatilityMultiplier[0],
-      stopLoss: stopLossWidth[0]
-    });
+  const runSimulation = () => {
+    mutation.mutate(params);
   };
 
-  // Auto-run when sliders change
+  // Run once on mount
   useEffect(() => {
-    if (simulationResults) {
-      const debounce = setTimeout(() => {
-        runSimulation();
-      }, 500);
-      return () => clearTimeout(debounce);
+    runSimulation();
+  }, []);
+
+  const updateParam = (key, value) => {
+    setParams(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Transform Python Data for Recharts
+  const chartData = useMemo(() => {
+    if (!results?.chart_data) return [];
+    const { best_case, median_case, worst_case } = results.chart_data;
+    
+    // Map arrays to objects
+    return median_case.map((val, i) => ({
+      trade: i,
+      median: val,
+      best: best_case[i],
+      worst: worst_case[i]
+    }));
+  }, [results]);
+
+  const CustomChartTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-[#0F123B]/95 border border-white/10 p-3 rounded-xl shadow-xl backdrop-blur-md">
+          <p className="text-white font-bold mb-2">Trade #{label}</p>
+          <div className="space-y-1 text-sm">
+            <p className="text-green-400">Best Case: ${payload[0].value.toLocaleString()}</p>
+            <p className="text-blue-400">Median: ${payload[1].value.toLocaleString()}</p>
+            <p className="text-red-400">Worst Case: ${payload[2].value.toLocaleString()}</p>
+          </div>
+        </div>
+      );
     }
-  }, [volatilityMultiplier[0], stopLossWidth[0]]);
+    return null;
+  };
 
   return (
     <TooltipProvider>
@@ -139,76 +116,87 @@ export default function PredictiveModel({ predictions, onRunSimulation }) {
               </div>
               <div>
                 <CardTitle className="text-xl font-bold text-white">Simulation Sandbox</CardTitle>
-                <p className="text-sm text-[#A0AEC0]">Monte Carlo prediction engine</p>
+                <p className="text-sm text-[#A0AEC0]">Monte Carlo prediction engine (Python Core)</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <Badge className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
                 The Quant Agent
               </Badge>
-              <Tooltip>
-                <TooltipTrigger>
-                  <HelpCircle className="w-4 h-4 text-[#A0AEC0]" />
-                </TooltipTrigger>
-                <TooltipContent className="glass-card border-white/20 text-white max-w-xs">
-                  <p>Runs 1000 Monte Carlo simulations using Geometric Brownian Motion. Adjust parameters to see how outcomes change.</p>
-                </TooltipContent>
-              </Tooltip>
             </div>
           </div>
         </CardHeader>
+        
         <CardContent className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Controls */}
-            <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            {/* 1. CONTROLS SIDEBAR */}
+            <div className="space-y-6 lg:col-span-1">
+              
+              {/* Win Rate Slider */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <label className="text-sm font-medium text-white">Volatility Multiplier</label>
-                  <span className="text-sm font-bold text-[#00C9FF]">{volatilityMultiplier[0].toFixed(1)}x</span>
+                  <label className="text-sm font-medium text-white">Win Rate</label>
+                  <span className="text-sm font-bold text-[#00C9FF]">{params.win_rate}%</span>
                 </div>
                 <Slider
-                  value={volatilityMultiplier}
-                  onValueChange={setVolatilityMultiplier}
-                  min={0.5}
-                  max={2.0}
+                  value={[params.win_rate]}
+                  onValueChange={(v) => updateParam("win_rate", v[0])}
+                  min={10}
+                  max={90}
+                  step={1}
+                  className="cursor-pointer"
+                />
+              </div>
+
+              {/* Risk Slider */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-sm font-medium text-white">Risk Per Trade</label>
+                  <span className="text-sm font-bold text-rose-400">{params.risk_per_trade}%</span>
+                </div>
+                <Slider
+                  value={[params.risk_per_trade]}
+                  onValueChange={(v) => updateParam("risk_per_trade", v[0])}
+                  min={0.1}
+                  max={10.0}
                   step={0.1}
                   className="cursor-pointer"
                 />
-                <div className="flex justify-between text-xs text-[#A0AEC0] mt-1">
-                  <span>Low (0.5x)</span>
-                  <span>High (2.0x)</span>
-                </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-sm font-medium text-white">Stop Loss Width</label>
-                  <span className="text-sm font-bold text-rose-400">{stopLossWidth[0].toFixed(1)}%</span>
+              {/* Advanced Inputs */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs text-[#A0AEC0]">Avg Win ($)</Label>
+                  <input 
+                    type="number"
+                    className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                    value={params.avg_win}
+                    onChange={(e) => updateParam("avg_win", Number(e.target.value))}
+                  />
                 </div>
-                <Slider
-                  value={stopLossWidth}
-                  onValueChange={setStopLossWidth}
-                  min={0.5}
-                  max={5.0}
-                  step={0.25}
-                  className="cursor-pointer"
-                />
-                <div className="flex justify-between text-xs text-[#A0AEC0] mt-1">
-                  <span>Tight (0.5%)</span>
-                  <span>Wide (5.0%)</span>
+                <div className="space-y-2">
+                  <Label className="text-xs text-[#A0AEC0]">Avg Loss ($)</Label>
+                  <input 
+                    type="number"
+                    className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                    value={params.avg_loss}
+                    onChange={(e) => updateParam("avg_loss", Number(e.target.value))}
+                  />
                 </div>
               </div>
 
               <Button
                 onClick={runSimulation}
-                disabled={isSimulating}
-                className="w-full font-bold text-white"
+                disabled={mutation.isPending}
+                className="w-full font-bold text-white h-12"
                 style={{ background: 'linear-gradient(135deg, #0075FF 0%, #00C9FF 100%)', borderRadius: '12px' }}
               >
-                {isSimulating ? (
+                {mutation.isPending ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Running {Math.min(100, Math.floor(simulationProgress))}% ({Math.floor(simulationProgress * 10)} iterations)
+                    Crunching Numbers...
                   </>
                 ) : (
                   <>
@@ -217,83 +205,116 @@ export default function PredictiveModel({ predictions, onRunSimulation }) {
                   </>
                 )}
               </Button>
-
-              {isSimulating && (
-                <Progress value={simulationProgress} className="h-2" />
-              )}
             </div>
 
-            {/* Results */}
-            <div>
+            {/* 2. RESULTS & CHART */}
+            <div className="lg:col-span-2 space-y-6">
               <AnimatePresence mode="wait">
-                {simulationResults ? (
+                {results ? (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     className="space-y-4"
                   >
-                    <div className="grid grid-cols-2 gap-3">
-                      <ResultCard
-                        label="Win Probability"
-                        value={`${simulationResults.win_probability.toFixed(1)}%`}
-                        color={simulationResults.win_probability >= 55 ? 'text-[#00C9FF]' : 'text-rose-400'}
-                        icon={Target}
-                      />
-                      <ResultCard
-                        label="Expected Value"
-                        value={`$${simulationResults.expected_value}`}
-                        color={parseFloat(simulationResults.expected_value) >= 0 ? 'text-[#00C9FF]' : 'text-rose-400'}
-                        icon={TrendingUp}
-                      />
+                    {/* Metrics Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <ResultCard
                         label="Risk of Ruin"
-                        value={`${simulationResults.risk_of_ruin}%`}
-                        color={parseFloat(simulationResults.risk_of_ruin) <= 5 ? 'text-[#00C9FF]' : 'text-rose-400'}
+                        value={`${results.metrics.risk_of_ruin}%`}
+                        color={results.metrics.risk_of_ruin > 1 ? 'text-rose-400' : 'text-[#00C9FF]'}
                         icon={AlertTriangle}
+                        subtext="Chance of losing 50%"
                       />
                       <ResultCard
-                        label="Kelly Size"
-                        value={`${(parseFloat(simulationResults.kelly_size) * 100).toFixed(0)}%`}
-                        subtext="of capital"
-                        color="text-purple-400"
+                        label="Expected Equity"
+                        value={`$${results.metrics.median_equity.toLocaleString()}`}
+                        color="text-blue-400"
+                        icon={Target}
+                        subtext="Median Outcome"
+                      />
+                      <ResultCard
+                        label="Max Potential"
+                        value={`$${results.metrics.max_equity.toLocaleString()}`}
+                        color="text-green-400"
                         icon={Zap}
+                        subtext="Best Case Scenario"
                       />
                     </div>
 
-                    <div className="p-4 rounded-xl bg-white/5">
-                      <p className="text-xs text-[#A0AEC0] mb-2">Outcome Distribution (1000 iterations)</p>
-                      <SimulationHistogram distribution={simulationResults.distribution} />
+                    {/* Chart Container */}
+                    <div className="p-4 rounded-xl bg-white/5 border border-white/10 h-[320px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="splitColor" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={COLORS.median} stopOpacity={0.3}/>
+                              <stop offset="95%" stopColor={COLORS.median} stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                          <XAxis 
+                            dataKey="trade" 
+                            stroke="#A0AEC0" 
+                            fontSize={10} 
+                            tickLine={false} 
+                            axisLine={false}
+                            minTickGap={20}
+                          />
+                          <YAxis 
+                            stroke="#A0AEC0" 
+                            fontSize={10} 
+                            tickLine={false} 
+                            axisLine={false}
+                            tickFormatter={(val) => `$${val/1000}k`}
+                            width={40}
+                          />
+                          <RechartsTooltip content={<CustomChartTooltip />} />
+                          
+                          {/* Cone of Uncertainty */}
+                          <Area 
+                            type="monotone" 
+                            dataKey="best" 
+                            stroke={COLORS.best} 
+                            fillOpacity={0} 
+                            strokeWidth={1}
+                            strokeDasharray="4 4"
+                            name="Best Case"
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="worst" 
+                            stroke={COLORS.worst} 
+                            fillOpacity={0} 
+                            strokeWidth={1}
+                            strokeDasharray="4 4"
+                            name="Worst Case"
+                          />
+                          <Area 
+                            type="monotone" 
+                            dataKey="median" 
+                            stroke={COLORS.median} 
+                            fill="url(#splitColor)" 
+                            strokeWidth={3}
+                            name="Median"
+                          />
+                          
+                          {/* Starting Equity Line */}
+                          <ReferenceLine y={params.starting_equity} stroke="#666" strokeDasharray="3 3" />
+                        </AreaChart>
+                      </ResponsiveContainer>
                     </div>
                   </motion.div>
                 ) : (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="h-full flex flex-col items-center justify-center text-center p-8"
-                  >
-                    <Brain className="w-16 h-16 text-[#A0AEC0] mb-4 opacity-50" />
-                    <p className="text-[#A0AEC0]">Adjust parameters and run simulation</p>
-                    <p className="text-xs text-[#A0AEC0]/70 mt-1">The Quant Agent will model 1000 possible outcomes</p>
-                  </motion.div>
+                  <div className="h-full flex flex-col items-center justify-center text-center p-12 opacity-50">
+                    <Brain className="w-16 h-16 text-[#A0AEC0] mb-4" />
+                    <p className="text-[#A0AEC0]">Ready to simulate</p>
+                  </div>
                 )}
               </AnimatePresence>
             </div>
-          </div>
 
-          {/* Market Outlook from predictions prop */}
-          {predictions?.market_outlook && (
-            <div className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10">
-              <div className="flex items-center gap-2 mb-2">
-                <Brain className="w-4 h-4 text-yellow-400" />
-                <p className="text-sm font-semibold text-white">Market Outlook</p>
-                <Badge className={`ml-auto ${predictions.market_sentiment === 'bullish' ? 'bg-[#00C9FF]/20 text-[#00C9FF]' : predictions.market_sentiment === 'bearish' ? 'bg-rose-500/20 text-rose-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                  {predictions.market_sentiment}
-                </Badge>
-              </div>
-              <p className="text-sm text-[#A0AEC0]">{predictions.market_outlook}</p>
-            </div>
-          )}
+          </div>
         </CardContent>
       </Card>
     </TooltipProvider>

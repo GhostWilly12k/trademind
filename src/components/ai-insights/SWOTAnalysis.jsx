@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -15,6 +15,22 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // Streaming SWOT Item Component
 function SWOTItem({ item, isStreaming }) {
+  // FIX: Robustly handle both string and object data types to prevent rendering errors
+  let content = "";
+  let confidence = null;
+  let sampleSize = null;
+  let winRate = null;
+
+  if (typeof item === 'string') {
+    content = item;
+  } else if (typeof item === 'object' && item !== null) {
+    // The AI might return the text in 'item', 'text', or 'content' keys
+    content = item.item || item.text || item.content || JSON.stringify(item);
+    confidence = item.confidence;
+    sampleSize = item.sample_size;
+    winRate = item.win_rate;
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -10 }}
@@ -22,21 +38,25 @@ function SWOTItem({ item, isStreaming }) {
       className="flex items-start gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
     >
       <div className="flex-1">
-        <p className="text-sm text-white">{item.text || item}</p>
-        {item.sample_size && (
-          <div className="flex items-center gap-2 mt-2">
-            <Badge variant="outline" className="text-xs border-white/20 text-[#A0AEC0]">
-              <BarChart3 className="w-3 h-3 mr-1" />
-              {item.sample_size} trades
-            </Badge>
-            {item.confidence && (
-              <Badge variant="outline" className="text-xs border-white/20 text-[#A0AEC0]">
-                {(item.confidence * 100).toFixed(0)}% confidence
+        <p className="text-sm text-white leading-relaxed">{content}</p>
+        
+        {/* Render Metadata Badges if they exist */}
+        {(sampleSize || confidence || winRate) && (
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            {sampleSize && (
+              <Badge variant="outline" className="text-[10px] border-white/20 text-[#A0AEC0] h-5 px-1.5 flex items-center">
+                <BarChart3 className="w-3 h-3 mr-1" />
+                {sampleSize} trades
               </Badge>
             )}
-            {item.win_rate && (
-              <Badge className="text-xs bg-[#00C9FF]/20 text-[#00C9FF] border-none">
-                {(item.win_rate * 100).toFixed(0)}% win rate
+            {confidence && (
+              <Badge variant="outline" className="text-[10px] border-white/20 text-[#A0AEC0] h-5 px-1.5">
+                {(confidence * 100).toFixed(0)}% conf
+              </Badge>
+            )}
+            {winRate && (
+              <Badge className="text-[10px] bg-[#00C9FF]/20 text-[#00C9FF] border-none h-5 px-1.5">
+                {(winRate * 100).toFixed(0)}% WR
               </Badge>
             )}
           </div>
@@ -54,9 +74,9 @@ function SWOTSection({ title, icon: Icon, items, color, bgColor, borderColor, is
   const isCurrentlyStreaming = isStreaming && streamingSection === title.toLowerCase();
   
   return (
-    <Card className={`glass-card border ${borderColor} overflow-hidden`}>
-      <div className={`absolute inset-0 ${bgColor} opacity-50`} />
-      <CardHeader className="relative border-b border-white/10 p-4">
+    <Card className={`glass-card border ${borderColor} overflow-hidden flex flex-col h-full`}>
+      <div className={`absolute inset-0 ${bgColor} opacity-50 pointer-events-none`} />
+      <CardHeader className="relative border-b border-white/10 p-4 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Icon className={`w-5 h-5 ${color}`} />
@@ -70,8 +90,8 @@ function SWOTSection({ title, icon: Icon, items, color, bgColor, borderColor, is
           )}
         </div>
       </CardHeader>
-      <CardContent className="relative p-4 space-y-2 min-h-[150px]">
-        <AnimatePresence>
+      <CardContent className="relative p-4 space-y-2 flex-1 min-h-[150px]">
+        <AnimatePresence mode="popLayout">
           {items && items.length > 0 ? (
             items.map((item, index) => (
               <SWOTItem 
@@ -81,8 +101,8 @@ function SWOTSection({ title, icon: Icon, items, color, bgColor, borderColor, is
               />
             ))
           ) : (
-            <div className="flex items-center justify-center h-full text-[#A0AEC0] text-sm">
-              {isCurrentlyStreaming ? 'Analyzing trade data...' : 'No data available'}
+            <div className="flex items-center justify-center h-full text-[#A0AEC0] text-sm italic">
+              {isCurrentlyStreaming ? 'Analyzing trade data...' : 'No insights found.'}
             </div>
           )}
         </AnimatePresence>
@@ -137,7 +157,7 @@ export default function SWOTAnalysis({ swotData, isStreaming = false, streamingS
             </Badge>
             <Tooltip>
               <TooltipTrigger>
-                <HelpCircle className="w-4 h-4 text-[#A0AEC0]" />
+                <HelpCircle className="w-4 h-4 text-[#A0AEC0] cursor-help hover:text-white transition-colors" />
               </TooltipTrigger>
               <TooltipContent className="glass-card border-white/20 text-white max-w-xs">
                 <p>Continuously scans your last 50 trades to find statistically significant patterns. All insights include sample size and confidence intervals.</p>
@@ -147,12 +167,12 @@ export default function SWOTAnalysis({ swotData, isStreaming = false, streamingS
           {isStreaming && (
             <div className="flex items-center gap-2 text-sm text-[#A0AEC0]">
               <Loader2 className="w-4 h-4 animate-spin text-[#00C9FF]" />
-              Streaming analysis...
+              <span>Streaming analysis...</span>
             </div>
           )}
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {sections.map((section) => (
             <SWOTSection 
               key={section.title} 
