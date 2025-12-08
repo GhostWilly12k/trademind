@@ -84,8 +84,8 @@ export default function BehavioralAnalytics({ trades = [] }) {
             </div>
           </CardHeader>
           <CardContent className="p-6">
-            {/* FIX: Explicit wrapper div with fixed height handles the chart sizing */}
-            <div className="h-[300px] w-full relative">
+            {/* Chart Container - Removed relative positioning here */}
+            <div className="h-[240px] w-full mb-4">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={costData} layout="vertical" margin={{ left: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.05)" horizontal={true} vertical={false} />
@@ -114,17 +114,18 @@ export default function BehavioralAnalytics({ trades = [] }) {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-
-              {costOfMistakes > 0 && (
-                <div className="absolute bottom-0 right-0 p-3 rounded-xl flex items-center gap-3" style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
-                  <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs font-semibold text-yellow-500">Cost of Errors</p>
-                    <p className="text-lg font-bold text-yellow-400">${costOfMistakes.toFixed(2)}</p>
-                  </div>
-                </div>
-              )}
             </div>
+
+            {/* Alert moved BELOW the chart */}
+            {costOfMistakes > 0 && (
+              <div className="w-full p-4 rounded-xl flex items-center justify-between" style={{ background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+                <div className="flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0" />
+                    <p className="text-sm font-semibold text-yellow-500">Cost of Errors</p>
+                </div>
+                <p className="text-lg font-bold text-yellow-400">${costOfMistakes.toFixed(2)}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
