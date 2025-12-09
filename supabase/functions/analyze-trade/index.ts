@@ -39,14 +39,15 @@ const AGENTS = {
 async function fetchLiveMarketData(watchlistString: string, apiKey: string) {
   if (!watchlistString || !apiKey) return "No live market data available.";
 
+  // Limit to top 5 to save execution time/tokens
   const symbols = watchlistString.split(',').map(s => s.trim()).filter(s => s.length > 0).slice(0, 5); 
-  const marketData = [];
-
+  
   console.log(`Fetching live data for: ${symbols.join(', ')}`);
 
   const promises = symbols.map(async (sym) => {
     try {
       let querySymbol = sym;
+      // Finnhub format handling
       if (!sym.includes(':')) querySymbol = sym.replace('/', '').replace('-', '');
 
       const response = await fetch(`https://finnhub.io/api/v1/quote?symbol=${querySymbol}&token=${apiKey}`);
@@ -79,101 +80,6 @@ interface GeminiModel {
 
 interface GeminiModelsResponse {
     models: GeminiModel[];
-}
-
-interface SWOT {
-    strengths: string[];
-    weaknesses: string[];
-    opportunities: string[];
-    threats: string[];
-}
-
-interface EffectiveIndicator {
-    name: string;
-    success_rate: number;
-    description: string;
-}
-
-interface SuccessfulPattern {
-    name: string;
-    trades: number;
-    win_rate: number;
-    insight: string;
-}
-
-interface TimeframePerformance {
-    timeframe: string;
-    win_rate: number;
-}
-
-interface TechnicalAnalysis {
-    effective_indicators: EffectiveIndicator[];
-    successful_patterns: SuccessfulPattern[];
-    timeframe_performance: TimeframePerformance[];
-}
-
-interface Signal {
-    symbol: string;
-    type: "LONG" | "SHORT";
-    entry_price: number;
-    stop_loss: number;
-    take_profit: number;
-    confidence: number;
-    technical_setup: string;
-    rationale: string;
-}
-
-interface Opportunity {
-    symbol: string;
-    setup_type: string;
-    probability: number;
-}
-
-interface Predictions {
-    market_outlook: string;
-    market_sentiment: "Bullish" | "Bearish" | "Neutral";
-    model_accuracy: number;
-    opportunities: Opportunity[];
-}
-
-interface LearnedPattern {
-    aspect: string;
-    insight: string;
-    confidence: number;
-}
-
-interface Learning {
-    maturity_level: "Novice" | "Apprentice" | "Journeyman" | "Expert" | "Master";
-    trades_analyzed: number;
-    learned_patterns: LearnedPattern[];
-    next_goals: string[];
-}
-
-interface AnalysisResponse {
-    swot: SWOT;
-    technical_analysis: TechnicalAnalysis;
-    signals: Signal[];
-    predictions: Predictions;
-    learning: Learning;
-}
-
-interface GeminiContentPart {
-    text: string;
-}
-
-interface GeminiContent {
-    parts: GeminiContentPart[];
-}
-
-interface GeminiCandidate {
-    content: GeminiContent;
-}
-
-interface GeminiGenerateResponse {
-    candidates?: GeminiCandidate[];
-    error?: {
-        message: string;
-    };
 }
 
 interface RequestBody {
@@ -219,6 +125,7 @@ Deno.serve(async (req: Request) => {
                 liveMarketContext = await fetchLiveMarketData(watchlist, finnKey);
         }
 
+        // Default to Flash for speed/cost if not specified
         const selectedModel: string = model || 'gemini-1.5-flash';
 
         const systemPrompt: string = `
@@ -257,8 +164,8 @@ Deno.serve(async (req: Request) => {
             "predictions": { 
                 "market_outlook": "string", 
                 "market_sentiment": "Bullish/Bearish/Neutral", 
-                "model_accuracy": number,
-                "opportunities": [{ "symbol": "string", "setup_type": "string", "probability": number }]
+                "model_accuracy": number, 
+                "opportunities": [{ "symbol": "string", "setup_type": "string", "probability": number }] 
             },
             "learning": { 
                 "maturity_level": "Novice/Apprentice/Journeyman/Expert/Master", 
@@ -299,7 +206,7 @@ Deno.serve(async (req: Request) => {
             }
         )
 
-        const data: GeminiGenerateResponse = await response.json()
+        const data = await response.json()
 
         if (data.error) {
             console.error("Gemini API Error:", JSON.stringify(data.error))
@@ -312,7 +219,7 @@ Deno.serve(async (req: Request) => {
         const cleanJson: string = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
         
         try {
-            const content: AnalysisResponse = JSON.parse(cleanJson)
+            const content = JSON.parse(cleanJson)
             return new Response(JSON.stringify(content), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             })
