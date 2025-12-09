@@ -276,9 +276,8 @@ export default function PredictiveModel() {
                             type="monotone" 
                             dataKey="best" 
                             stroke={COLORS.best} 
-                            fillOpacity={0} 
-                            strokeWidth={1}
-                            strokeDasharray="4 4"
+                            fill="url(#splitColor)"
+                            strokeWidth={3}
                             name="Best Case"
                           />
                           <Area 
@@ -294,8 +293,9 @@ export default function PredictiveModel() {
                             type="monotone" 
                             dataKey="median" 
                             stroke={COLORS.median} 
-                            fill="url(#splitColor)" 
-                            strokeWidth={3}
+                            fillOpacity={0} 
+                            strokeWidth={1}
+                            strokeDasharray="4 4"
                             name="Median"
                           />
                           

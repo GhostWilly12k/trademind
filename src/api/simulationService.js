@@ -3,7 +3,7 @@
  * Connects to the Python/FastAPI backend for heavy Monte Carlo calculations.
  */
 
-const API_URL = "http://localhost:8000"; // Your Python Server
+const API_URL = import.meta.env.VITE_SIM_API_URL; // Your Python Server
 
 export const SimulationService = {
   /**

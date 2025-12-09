@@ -76,7 +76,7 @@ export default function AIInsights() {
                 Activate Your AI Trading Assistant
               </h2>
               <p className="text-gray-400 text-lg mb-8 leading-relaxed">
-                Using <strong>Gemini 2.5 Flash</strong> to analyze your trading style, master your technical analysis techniques, 
+                Using Artificial Intelligence to analyze your trading style, master your technical analysis techniques, 
                 generate real-time signals, and provide comprehensive SWOT analysis.
               </p>
 
@@ -135,7 +135,7 @@ export default function AIInsights() {
             <Brain className="w-10 h-10 text-[#00D9A3]" />
             AI Trading Assistant
           </h1>
-          <p className="text-gray-500">Comprehensive analysis powered by Gemini 2.5 Flash</p>
+          <p className="text-gray-500">Comprehensive analysis powered by AI</p>
         </div>
         
         <div className="flex items-center gap-2">
