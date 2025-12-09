@@ -1,24 +1,17 @@
-/**
- * Market Data Service (Tiingo Implementation with Proxy)
- * * FIXES:
- * 1. CORS: Uses '/api-tiingo' proxy instead of direct URL.
- * 2. Forex: Routes 'eurusd' to /fx/ endpoint.
- * 3. Crypto: Routes 'btcusd' to /crypto/ endpoint.
- */
+import { supabase } from './supabaseClient';
 
-const API_KEY = import.meta.env.VITE_TIINGO_API_KEY;
-const USE_MOCK_DATA = !API_KEY; 
+const API_KEY = import.meta.env.VITE_TIINGO_API_KEY; // Kept for reference or local dev if needed, but Edge Function uses env var.
+// Actually, if we use Edge Function, the key stays on server.
+// But user might want to toggle mock data.
+const USE_MOCK_DATA = false; 
 
 // Normalize user inputs to Tiingo tickers
 const SYMBOL_MAP = {
-  // Crypto
   'BTC': 'btcusd',
   'ETH': 'ethusd',
   'SOL': 'solusd',
   'BINANCE:BTCUSDT': 'btcusd',
   'BINANCE:ETHUSDT': 'ethusd',
-  
-  // Forex
   'EUR/USD': 'eurusd',
   'OANDA:EUR_USD': 'eurusd',
   'GBP/USD': 'gbpusd',
@@ -27,14 +20,11 @@ const SYMBOL_MAP = {
 
 export const MarketDataService = {
   
-  /**
-   * 1. Search (Local filtered list + basic pass-through)
-   */
   async searchSymbols(query) {
     if (!query) return [];
     const q = query.toLowerCase();
     
-    // Quick local matches for instant feedback
+    // Quick local matches (Search API is heavy/expensive, keep this local for now)
     const common = [
       { symbol: 'btcusd', name: 'Bitcoin', type: 'Crypto' },
       { symbol: 'ethusd', name: 'Ethereum', type: 'Crypto' },
@@ -54,15 +44,10 @@ export const MarketDataService = {
     );
   },
 
-  /**
-   * 2. Get Quotes (The Engine)
-   */
   async getQuotes(symbols) {
     if (!symbols.length) return {};
 
-    // --- MOCK MODE ---
     if (USE_MOCK_DATA) {
-        // console.warn("Using Mock Data (No API Key)");
         const mockData = {};
         symbols.forEach(sym => {
             const base = 100 + (sym.length * 10);
@@ -71,50 +56,43 @@ export const MarketDataService = {
         return mockData;
     }
 
-    // --- REAL DATA (VIA PROXY) ---
     const quotes = {};
+    const FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/market-proxy`;
+    
+    // We need the anon key for authorization headers if RLS/Function security is on
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
     await Promise.all(symbols.map(async (rawSym) => {
         try {
             const sym = SYMBOL_MAP[rawSym] || rawSym.toLowerCase(); 
-            let endpoint = '';
             
-            // --- ROUTING LOGIC ---
-            
-            // 1. Crypto: Explicit list or common crypto tickers
+            // Determine type for routing
+            let type = 'stock';
             const isCrypto = ['btcusd', 'ethusd', 'solusd'].includes(sym) || sym.includes('binance');
-            
-            // 2. Forex: 6 characters, not a known stock like 'google' or 'nvidia'
-            // (Simple heuristic: most 6-letter tickers users type here are forex)
             const isForex = !isCrypto && sym.length === 6 && !['googl', 'nvidia', 'amazon'].includes(sym);
+            
+            if (isCrypto) type = 'crypto';
+            else if (isForex) type = 'fx';
 
-            if (isCrypto) {
-                // Endpoint: Crypto Top-of-Book
-                endpoint = `/api-tiingo/tiingo/crypto/top?tickers=${sym}&token=${API_KEY}`;
-            } else if (isForex) {
-                // Endpoint: Forex Top-of-Book
-                endpoint = `/api-tiingo/tiingo/fx/top?tickers=${sym}&token=${API_KEY}`;
-            } else {
-                // Endpoint: IEX (Stocks)
-                endpoint = `/api-tiingo/iex/?tickers=${sym}&token=${API_KEY}`;
-            }
-
-            // --- FETCH ---
-            const res = await fetch(endpoint, {
-                headers: { 'Content-Type': 'application/json' }
+            // Call Supabase Edge Function
+            const res = await fetch(FUNCTION_URL, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${anonKey}`
+                },
+                body: JSON.stringify({ type, symbol: sym })
             });
             
             if (!res.ok) {
-                 // console.warn(`Fetch failed for ${sym}: ${res.status}`);
+                 console.warn(`Proxy Fetch failed for ${sym}: ${res.status}`);
                  return;
             }
 
             const data = await res.json();
             
-            // --- PARSE ---
+            // Parse Tiingo Response (array)
             let price = null;
-            
-            // Tiingo returns arrays for all these endpoints
             if (Array.isArray(data) && data.length > 0) {
                 const item = data[0];
                 // Different endpoints use different keys for price
@@ -125,12 +103,12 @@ export const MarketDataService = {
                 quotes[rawSym] = {
                     symbol: rawSym,
                     price: parseFloat(price),
-                    changePercent: 0 // Real-time IEX/FX endpoints optimize for speed, not 24h stats
+                    changePercent: 0 // Real-time IEX/FX endpoints optimize for speed
                 };
             }
 
         } catch (e) {
-            console.warn(`Tiingo error for ${rawSym}`, e);
+            console.warn(`Proxy error for ${rawSym}`, e);
         }
     }));
 
