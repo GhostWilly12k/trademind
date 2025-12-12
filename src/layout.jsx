@@ -63,8 +63,8 @@ const ReopenTrigger = () => {
   return (
     <div
       className={`hidden md:flex mb-4 transition-all duration-300 ease-in-out ${state === "collapsed"
-          ? "opacity-100 h-auto translate-x-0"
-          : "opacity-0 h-0 -translate-x-4 overflow-hidden pointer-events-none"
+        ? "opacity-100 h-auto translate-x-0"
+        : "opacity-0 h-0 -translate-x-4 overflow-hidden pointer-events-none"
         }`}
     >
       <SidebarTrigger className={triggerStyle} />
@@ -205,8 +205,8 @@ export default function Layout() {
                         asChild
                         isActive={isActive}
                         className={`mb-2 transition-all duration-200 rounded-xl group ${isActive
-                            ? "bg-gradient-to-r from-blue-600/10 to-cyan-500/10"
-                            : "hover:bg-white/5"
+                          ? "bg-gradient-to-r from-blue-600/10 to-cyan-500/10"
+                          : "hover:bg-white/5"
                           }`}
                       >
                         <Link to={item.url} className="flex items-center gap-3 px-4 py-3 w-full">
@@ -234,8 +234,24 @@ export default function Layout() {
         <SidebarFooter className="border-t border-white/10 p-4 mt-auto group-data-[state=collapsed]:hidden">
           <div className="flex items-center justify-between gap-2 p-3 rounded-xl glass-card glass-hover min-w-0">
             <div className="flex items-center gap-3 min-w-0 overflow-hidden">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center relative flex-shrink-0" style={{ background: 'linear-gradient(135deg, rgba(0, 117, 255, 0.2) 0%, rgba(0, 201, 255, 0.2) 100%)', border: '1px solid rgba(0, 117, 255, 0.3)' }}>
-                <User className="w-5 h-5 text-[#0075FF]" />
+              <div className="w-10 h-10 rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(0, 117, 255, 0.2) 0%, rgba(0, 201, 255, 0.2) 100%)',
+                  border: '1px solid rgba(0, 117, 255, 0.3)'
+                }}>
+
+                {/* CHECK FOR DB IMAGE */}
+                {user?.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt="Profile"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  /* FALLBACK TO ICON IF NO IMAGE */
+                  <User className="w-5 h-5 text-[#0075FF]" />
+                )}
+
               </div>
               <div className="flex-1 min-w-0 flex flex-col">
                 <p className="font-semibold text-sm text-white truncate">

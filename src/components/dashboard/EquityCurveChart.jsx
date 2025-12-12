@@ -8,6 +8,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
       <div
+        // Fixed: Removed fixed height h-[300px] from tooltip, it was likely too large
         className="px-4 py-3 rounded-xl border border-white/10 shadow-xl"
         style={{
           background: 'rgba(15, 18, 59, 0.95)',
@@ -28,19 +29,17 @@ export default function EquityCurveChart({ trades = [] }) {
   const { data, currentEquity } = useMemo(() => {
     if (!trades || trades.length === 0) return { data: [], currentEquity: 0 };
 
-    // 1. Sort by date (oldest to newest)
     const sortedTrades = [...trades].sort((a, b) =>
       new Date(a.exit_date || a.entry_date) - new Date(b.exit_date || b.entry_date)
     );
 
     let runningTotal = 0;
     
-    // 2. Map to chart format
     const chartData = sortedTrades.map(trade => {
       runningTotal += (trade.profit_loss || 0);
       return {
         date: format(new Date(trade.exit_date || trade.entry_date), 'MMM d'),
-        fullDate: format(new Date(trade.exit_date || trade.entry_date), 'PPP'), // For tooltip if needed
+        fullDate: format(new Date(trade.exit_date || trade.entry_date), 'PPP'),
         equity: runningTotal,
       };
     });
@@ -49,13 +48,13 @@ export default function EquityCurveChart({ trades = [] }) {
   }, [trades]);
 
   return (
-    <Card className="glass-card border-none flex flex-col h-full">
-      <CardHeader className="border-b border-white/10 p-6 flex flex-row items-center justify-between">
+    // Fixed: Changed h-[300px] to min-h-[400px] to accommodate header + chart without overflow
+    <Card className="glass-card border-none flex flex-col w-full min-h-[400px]">
+      <CardHeader className="border-b border-white/10 p-6 flex flex-row items-center justify-between shrink-0">
         <div>
           <CardTitle className="text-xl font-bold text-white">Equity Curve</CardTitle>
           <p className="text-sm text-slate-400">Cumulative P&L over time</p>
         </div>
-        {/* Live Equity Badge */}
         {data.length > 0 && (
           <div className={`px-3 py-1 rounded-lg border flex items-center gap-2 ${currentEquity >= 0 ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
             <TrendingUp size={16} />
@@ -64,10 +63,12 @@ export default function EquityCurveChart({ trades = [] }) {
         )}
       </CardHeader>
       
-      <CardContent className="p-6 flex-1 min-h-[300px]">
+      {/* Fixed: Removed fixed height from Content to let it fill flex space naturally */}
+      <CardContent className="p-6 flex-1 flex flex-col min-h-0">
         {data.length > 0 ? (
-          <div className="h-[300px] w-full min-w-0">
-            <ResponsiveContainer width="100%" height="100%">
+          // Fixed: Explicit height on this wrapper is CRITICAL for Recharts
+          <div className="h-[300px] w-full min-w-0"> 
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={data}>
                 <defs>
                   <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
@@ -119,7 +120,7 @@ export default function EquityCurveChart({ trades = [] }) {
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="h-full w-full flex flex-col items-center justify-center text-slate-500 space-y-2">
+          <div className="h-[300px] w-full flex flex-col items-center justify-center text-slate-500 space-y-2">
             <TrendingUp size={48} className="opacity-20" />
             <p>No trades logged yet</p>
           </div>

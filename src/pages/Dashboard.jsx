@@ -33,25 +33,25 @@ export default function Dashboard() {
 
     // 3. Helper to calculate stats for a subset
     const getStats = (subset) => {
-        if (!subset.length) return { pnl: 0, winRate: 0, count: 0, pf: 0 };
-        
-        const wins = subset.filter(t => (t.profit_loss || 0) > 0);
-        const losses = subset.filter(t => (t.profit_loss || 0) < 0);
-        const totalPnL = subset.reduce((sum, t) => sum + (t.profit_loss || 0), 0);
-        const winRate = (wins.length / subset.length) * 100;
-        
-        const grossProfit = wins.reduce((sum, t) => sum + (t.profit_loss || 0), 0);
-        const grossLoss = Math.abs(losses.reduce((sum, t) => sum + (t.profit_loss || 0), 0));
-        const pf = grossLoss === 0 ? grossProfit : grossProfit / grossLoss;
+      if (!subset.length) return { pnl: 0, winRate: 0, count: 0, pf: 0 };
 
-        return { pnl: totalPnL, winRate, count: subset.length, pf };
+      const wins = subset.filter(t => (t.profit_loss || 0) > 0);
+      const losses = subset.filter(t => (t.profit_loss || 0) < 0);
+      const totalPnL = subset.reduce((sum, t) => sum + (t.profit_loss || 0), 0);
+      const winRate = (wins.length / subset.length) * 100;
+
+      const grossProfit = wins.reduce((sum, t) => sum + (t.profit_loss || 0), 0);
+      const grossLoss = Math.abs(losses.reduce((sum, t) => sum + (t.profit_loss || 0), 0));
+      const pf = grossLoss === 0 ? grossProfit : grossProfit / grossLoss;
+
+      return { pnl: totalPnL, winRate, count: subset.length, pf };
     };
 
     // 4. Split Data
     const currentTrades = sortedTrades.filter(t => new Date(t.entry_date) >= currentPeriodStart);
     const prevTrades = sortedTrades.filter(t => {
-        const d = new Date(t.entry_date);
-        return d >= prevPeriodStart && d < currentPeriodStart;
+      const d = new Date(t.entry_date);
+      return d >= prevPeriodStart && d < currentPeriodStart;
     });
 
     const currentStats = getStats(currentTrades);
@@ -60,23 +60,22 @@ export default function Dashboard() {
 
     // 5. Calculate Percentage Changes (Current vs Previous)
     const calcChange = (curr, prev) => {
-        if (prev === 0) return curr === 0 ? 0 : 100; // If prev was 0, any growth is 100%
-        return ((curr - prev) / Math.abs(prev)) * 100;
+      if (prev === 0) return curr === 0 ? 0 : 100; // If prev was 0, any growth is 100%
+      return ((curr - prev) / Math.abs(prev)) * 100;
     };
 
     return {
-        // Main Display Values (All Time)
-        totalPnL: allTimeStats.pnl,
-        winRate: allTimeStats.winRate,
-        totalTrades: allTimeStats.count,
-        profitFactor: allTimeStats.pf,
+      // Main Display Values (All Time)
+      totalPnL: allTimeStats.pnl,
+      winRate: allTimeStats.winRate,
+      totalTrades: allTimeStats.count,
+      profitFactor: allTimeStats.pf,
 
-        // Change Indicators (Last 30 Days vs Prior 30 Days)
-        pnlChange: calcChange(currentStats.pnl, prevStats.pnl),
-        // For Win Rate, we typically show absolute difference (e.g. +5%), not percent change
-        winRateChange: currentStats.winRate - prevStats.winRate, 
-        tradesChange: calcChange(currentStats.count, prevStats.count),
-        pfChange: currentStats.pf - prevStats.pf // Absolute diff for PF is usually cleaner
+      // Change Indicators (Last 30 Days vs Prior 30 Days)
+      pnlChange: calcChange(currentStats.pnl, prevStats.pnl),
+      winRateChange: currentStats.winRate - prevStats.winRate,
+      tradesChange: calcChange(currentStats.count, prevStats.count),
+      pfChange: currentStats.pf - prevStats.pf
     };
   }, [trades]);
 
@@ -85,7 +84,7 @@ export default function Dashboard() {
       <div className="w-full space-y-6">
         <Skeleton className="h-12 w-64 bg-[#1A1A1A]" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1,2,3,4].map(i => <Skeleton key={i} className="h-32 bg-[#1A1A1A]" />)}
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 bg-[#1A1A1A]" />)}
         </div>
       </div>
     );
@@ -114,7 +113,7 @@ export default function Dashboard() {
           value={metrics.totalPnL.toFixed(2)}
           change={metrics.pnlChange}
           icon={DollarSign}
-          isPositive={metrics.pnlChange >= 0} 
+          isPositive={metrics.pnlChange >= 0}
           format="currency"
         />
         <MetricCard
@@ -128,7 +127,7 @@ export default function Dashboard() {
         <MetricCard
           title="Total Trades"
           value={metrics.totalTrades}
-          change={metrics.tradesChange} // Growth in volume
+          change={metrics.tradesChange} 
           icon={TrendingUp}
           isPositive={metrics.tradesChange >= 0}
         />
@@ -141,9 +140,15 @@ export default function Dashboard() {
         />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
-        <EquityCurveChart trades={trades} />
-        <RecentTradesTable trades={trades} />
+      {/* CHANGED: Replaced grid-cols-2 with a vertical stack */}
+      <div className="flex flex-col gap-6 w-full">
+        <div className="w-full">
+          <EquityCurveChart trades={trades} />
+        </div>
+
+        <div className="w-full">
+          <RecentTradesTable trades={trades} />
+        </div>
       </div>
     </div>
   );
