@@ -5,7 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { format } from "date-fns";
 
-export default function RecentTradesTable({ trades }) {
+export default function RecentTradesTable({ trades = [] }) {
+  // Guard against null/undefined and check length
+  const hasTrades = trades && trades.length > 0;
+
   return (
     <Card className="glass-card glass-hover border-none">
       <CardHeader className="border-b border-white/10 p-6">
@@ -25,27 +28,44 @@ export default function RecentTradesTable({ trades }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {trades.slice(0, 5).map((trade) => (
-                <TableRow key={trade.id} className="border-white/5 hover:bg-white/5 transition-all">
-                  <TableCell className="font-bold text-white">{trade.symbol}</TableCell>
-                  <TableCell>
-                    <Badge className={trade.trade_type === 'long' ? 'bg-green-500/20 text-green-300 border border-green-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'} style={{ borderRadius: '20px', padding: '4px 12px', fontSize: '11px', fontWeight: 600 }}>
-                      {trade.trade_type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-white font-medium">${trade.entry_price?.toFixed(2)}</TableCell>
-                  <TableCell className="text-white font-medium">${trade.exit_price?.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <div className={`flex items-center gap-1 font-bold ${trade.profit_loss >= 0 ? 'text-green-300' : 'text-red-300'}`}>
-                      {trade.profit_loss >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                      ${Math.abs(trade.profit_loss || 0).toFixed(2)}
+              {hasTrades ? (
+                trades.slice(0, 5).map((trade) => (
+                  <TableRow key={trade.id} className="border-white/5 hover:bg-white/5 transition-all">
+                    <TableCell className="font-bold text-white">{trade.symbol}</TableCell>
+                    <TableCell>
+                      <Badge 
+                        className={trade.trade_type === 'long' 
+                          ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
+                          : 'bg-red-500/20 text-red-300 border border-red-500/30'
+                        } 
+                        style={{ borderRadius: '20px', padding: '4px 12px', fontSize: '11px', fontWeight: 600 }}
+                      >
+                        {trade.trade_type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-white font-medium">${trade.entry_price?.toFixed(2)}</TableCell>
+                    <TableCell className="text-white font-medium">${trade.exit_price?.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <div className={`flex items-center gap-1 font-bold ${trade.profit_loss >= 0 ? 'text-green-300' : 'text-red-300'}`}>
+                        {trade.profit_loss >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                        ${Math.abs(trade.profit_loss || 0).toFixed(2)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-[#A0AEC0] font-medium">
+                      {format(new Date(trade.entry_date), 'MMM d, yyyy')}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-[300px] text-center">
+                    <div className="flex flex-col items-center justify-center text-slate-500 gap-2">
+                      <TrendingUp size={48} className="opacity-20" />
+                      <p className="text-sm font-medium">No trades logged yet</p>
                     </div>
                   </TableCell>
-                  <TableCell className="text-[#A0AEC0] font-medium">
-                    {format(new Date(trade.entry_date), 'MMM d, yyyy')}
-                  </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </div>

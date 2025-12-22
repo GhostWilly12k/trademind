@@ -2,7 +2,8 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Activity } from "lucide-react";
-import { api } from "@/api/supabaseClient";
+import { api, createClerkSupabaseClient } from "@/api/supabaseClient";
+import { useUser, useAuth } from "@clerk/clerk-react";
 
 import SystemViability from "../components/analytics/SystemViability";
 import TradeOptimization from "../components/analytics/TradeOptimization";
@@ -10,9 +11,16 @@ import RiskSurvival from "../components/analytics/RiskSurvival";
 import BehavioralAnalytics from "../components/analytics/BehavioralAnalytics";
 
 export default function Analytics() {
+  const { user } = useUser();
+  const { getToken } = useAuth();
+
   const { data: trades = [], isLoading } = useQuery({
     queryKey: ['trades'],
-    queryFn: () => api.entities.trade.list(),
+    queryFn: async () => {
+      if (!user) return [];
+      const client = await createClerkSupabaseClient(getToken);
+      return api.entities.trade.list(client);
+    },
   });
 
   if (isLoading) {

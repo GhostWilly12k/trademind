@@ -1,50 +1,104 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Environment variables
+// 1. Load and Verify Environment Variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error(
+    "CRITICAL ERROR: Supabase environment variables are missing. Check your .env file."
+  );
+}
+
+// 2. Factory for Authenticated Clerk Client
+// Call this inside your React components using: const { getToken } = useAuth();
+export const createClerkSupabaseClient = async (getToken) => {
+  const token = await getToken({ template: 'supabase' });
+
+  // Custom header object
+  // We EXPLICITLY add 'apikey' to ensure Supabase sees it
+  const headers = {
+    apikey: supabaseAnonKey,
+  };
+
+  // Only add Authorization if we actually have a token
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: headers,
+    },
+  });
+};
+
+// 3. Fallback Client (Unauthenticated / Public)
+// Useful for public queries or when the user is not logged in
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
- * Service Layer that mimics your old Base44 structure.
- * This makes refactoring your components easier.
+ * Service Layer
+ * Updated to accept an authenticated 'client' instance.
+ * Defaults to the 'supabase' fallback if not provided.
  */
 export const api = {
-  auth: {
-    async me() {
-      const { data: { user } } = await supabase.auth.getUser();
-      return user;
-    },
-    async signIn(email, password) {
-      return supabase.auth.signInWithPassword({ email, password });
-    },
-    async signOut() {
-      return supabase.auth.signOut();
-    }
-  },
+  // Use useAuth() from Clerk in your components for authentication state.
+  // These helpers are for data operations.
+  
   entities: {
+    profile: {
+      // FIX: Now accepts userId explicitly. Do not rely on client.auth.getUser()
+      async get(client = supabase, userId) {
+        if (!userId) return null;
+        
+        const { data, error } = await client
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+          
+        // Ignore "Row not found" error (code PGRST116) - just return null
+        if (error && error.code !== 'PGRST116') throw error; 
+        return data;
+      },
+      
+      // FIX: Updates must include the ID or rely on the caller to know it
+      async update(updates, client = supabase) {
+        if (!updates.id) throw new Error("Profile ID is required for updates");
+
+        const { data, error } = await client
+          .from('profiles')
+          .upsert(updates)
+          .select();
+          
+        if (error) throw error;
+        return data[0];
+      }
+    },
+
     trade: {
-      async list() {
-        const { data, error } = await supabase
+      async list(client = supabase) {
+        const { data, error } = await client
           .from('trades')
           .select('*')
           .order('entry_date', { ascending: false });
         if (error) throw error;
         return data;
       },
-      async create(tradeData) {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        const { data, error } = await supabase
+      // FIX: tradeData MUST include 'user_id' from the React component
+      async create(tradeData, client = supabase) {
+        if (!tradeData.user_id) throw new Error("user_id is missing in tradeData");
+
+        const { data, error } = await client
           .from('trades')
-          .insert([{ ...tradeData, user_id: user.id }])
+          .insert([tradeData])
           .select();
         if (error) throw error;
         return data[0];
       },
-      async update(id, updates) {
-        const { data, error } = await supabase
+      async update(id, updates, client = supabase) {
+        const { data, error } = await client
           .from('trades')
           .update(updates)
           .eq('id', id)
@@ -52,8 +106,8 @@ export const api = {
         if (error) throw error;
         return data[0];
       },
-      async delete(id) {
-        const { error } = await supabase
+      async delete(id, client = supabase) {
+        const { error } = await client
           .from('trades')
           .delete()
           .eq('id', id);
@@ -61,26 +115,29 @@ export const api = {
         return true;
       }
     },
+
     watchlist: {
-      async list() {
-        const { data, error } = await supabase
+      async list(client = supabase) {
+        const { data, error } = await client
           .from('watchlist')
           .select('*')
           .order('created_at', { ascending: false });
         if (error) throw error;
         return data;
       },
-      async create(itemData) {
-        const { data: { user } } = await supabase.auth.getUser();
-        const { data, error } = await supabase
+      // FIX: itemData MUST include 'user_id' from the React component
+      async create(itemData, client = supabase) {
+        if (!itemData.user_id) throw new Error("user_id is missing in itemData");
+
+        const { data, error } = await client
           .from('watchlist')
-          .insert([{ ...itemData, user_id: user.id }])
+          .insert([itemData])
           .select();
         if (error) throw error;
         return data[0];
       },
-      async update(id, updates) {
-        const { data, error } = await supabase
+      async update(id, updates, client = supabase) {
+        const { data, error } = await client
           .from('watchlist')
           .update(updates)
           .eq('id', id)
@@ -88,8 +145,8 @@ export const api = {
         if (error) throw error;
         return data[0];
       },
-      async delete(id) {
-        const { error } = await supabase
+      async delete(id, client = supabase) {
+        const { error } = await client
           .from('watchlist')
           .delete()
           .eq('id', id);
@@ -98,20 +155,44 @@ export const api = {
       }
     },
   },
+
+  storage: {
+    // FIX: Requires explicit userId argument
+    async uploadImage(file, userId, bucket = 'trade-screenshots', client = supabase) {
+      if (!userId) throw new Error("User ID is required for file upload path");
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${userId}/${Date.now()}.${fileExt}`;
+      
+      const { error } = await client.storage
+        .from(bucket)
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = client.storage
+        .from(bucket)
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    }
+  },
+
   integrations: {
-    // NEW: List available models from Edge Function
-    async listModels() {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || supabaseAnonKey;
+    async listModels(token) {
+      const headers = { 'Content-Type': 'application/json' };
+      // Explicitly set apikey here as well for direct fetch calls
+      headers['apikey'] = supabaseAnonKey;
+      if (token) headers['Authorization'] = `Bearer ${token}`;
       
       try {
         const response = await fetch(`${supabaseUrl}/functions/v1/analyze-trade`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          headers,
           body: JSON.stringify({ action: 'list_models' })
         });
         
-        if (!response.ok) return ['gemini-pro']; // Fallback if offline
+        if (!response.ok) return ['gemini-pro']; 
         const data = await response.json();
         return data.models || ['gemini-pro'];
       } catch (err) {
@@ -120,34 +201,33 @@ export const api = {
       }
     },
 
-    // FIXED: Manual fetch implementation for total control over Body/Headers
-    async invokeAIAnalysis(prompt, contextData, model = 'gemini-pro') {
-      // 1. Get current session token
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || supabaseAnonKey;
-
-      // 2. Construct URL
+    async invokeAIAnalysis(prompt, contextData, model = 'gemini-pro', token) {
       const functionUrl = `${supabaseUrl}/functions/v1/analyze-trade`;
 
-      // 3. Manual Fetch
+      const headers = {
+        'Content-Type': 'application/json',
+        'apikey': supabaseAnonKey // Explicitly add apikey
+      };
+      
+      if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+      } else {
+          headers['Authorization'] = `Bearer ${supabaseAnonKey}`;
+      }
+
       const response = await fetch(functionUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        // IMPORTANT: Flatten the structure so Edge Function gets { trades, watchlist } at root
+        headers,
         body: JSON.stringify({
           trades: contextData.trades || [],
           watchlist: contextData.watchlist || "",
-          model: model // Pass selected model
+          model: model 
         })
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Edge Function Failed:", errorText);
-        // Try to parse JSON error if possible
         try {
            const jsonError = JSON.parse(errorText);
            throw new Error(jsonError.error || "AI Analysis Failed");

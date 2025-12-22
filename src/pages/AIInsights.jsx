@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Brain, Sparkles, Loader2, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { api } from "@/api/supabaseClient";
+import { api, createClerkSupabaseClient } from "@/api/supabaseClient";
+import { useUser, useAuth } from "@clerk/clerk-react";
 
 import SWOTAnalysis from "../components/ai-insights/SWOTAnalysis";
 import TradingSignals from "../components/ai-insights/TradingSignals";
@@ -19,26 +20,43 @@ export default function AIInsights() {
   
   // Hardcoded Model: Gemini 2.5 Flash
   const selectedModel = 'gemini-2.5-flash-preview-09-2025';
+  const { user } = useUser();
+  const { getToken } = useAuth();
 
   const { data: trades = [] } = useQuery({
     queryKey: ['trades'],
-    queryFn: () => api.entities.trade.list()
+    queryFn: async () => {
+      if (!user) return [];
+      const client = await createClerkSupabaseClient(getToken);
+      return api.entities.trade.list(client);
+    }
   });
 
   const { data: watchlist = [] } = useQuery({
     queryKey: ['watchlist'],
-    queryFn: () => api.entities.watchlist ? api.entities.watchlist.list() : Promise.resolve([])
+    queryFn: async () => {
+      if (!user) return [];
+      const client = await createClerkSupabaseClient(getToken);
+      return api.entities.watchlist ? api.entities.watchlist.list(client) : Promise.resolve([]);
+    }
   });
 
   const generateComprehensiveInsights = async () => {
     setIsGenerating(true);
     try {
+      if (!user) {
+        console.warn('User not authenticated');
+        setIsGenerating(false);
+        return;
+      }
       const watchlistSymbols = watchlist.map((w) => w.symbol).join(', ');
-      
+      // Acquire Clerk token and pass it to the integrations API
+      const token = await getToken({ template: 'supabase' });
       const result = await api.integrations.invokeAIAnalysis(
         "Generate comprehensive trading insights",
         { trades, watchlist: watchlistSymbols },
-        selectedModel
+        selectedModel,
+        token
       );
 
       if (result) {

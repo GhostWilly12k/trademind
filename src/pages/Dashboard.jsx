@@ -4,16 +4,24 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Plus, DollarSign, Target, TrendingUp, Award } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api } from "@/api/supabaseClient";
+import { api, createClerkSupabaseClient } from "@/api/supabaseClient";
+import { useUser, useAuth } from "@clerk/clerk-react";
 
 import MetricCard from "../components/dashboard/MetricCard";
 import RecentTradesTable from "../components/dashboard/RecentTradesTable";
 import EquityCurveChart from "../components/dashboard/EquityCurveChart";
 
 export default function Dashboard() {
+  const { user } = useUser();
+  const { getToken } = useAuth();
+
   const { data: trades = [], isLoading } = useQuery({
     queryKey: ['trades'],
-    queryFn: () => api.entities.trade.list(),
+    queryFn: async () => {
+      if (!user) return [];
+      const client = await createClerkSupabaseClient(getToken);
+      return api.entities.trade.list(client);
+    },
   });
 
   const metrics = useMemo(() => {

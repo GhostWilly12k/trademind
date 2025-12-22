@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
-import { api } from "@/api/supabaseClient";
+import { api, createClerkSupabaseClient } from "@/api/supabaseClient";
+import { useUser, useAuth } from "@clerk/clerk-react";
 import { MarketDataService } from "@/api/marketData";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,8 @@ import PlanCard from "../components/watchlist/PlanCard"; // Renamed
 import PlanForm from "../components/watchlist/PlanForm"; // Renamed
 
 export default function TradePlanner() {
+  const { user } = useUser();
+  const { getToken } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -21,7 +24,11 @@ export default function TradePlanner() {
   // 1. Fetch Plans
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ['watchlist'],
-    queryFn: () => api.entities.watchlist.list(),
+    queryFn: async () => {
+      if (!user) return [];
+      const client = await createClerkSupabaseClient(getToken);
+      return api.entities.watchlist.list(client);
+    },
   });
 
   // 2. Poll Live Data (For "Distance to Entry" calculations)
@@ -34,17 +41,32 @@ export default function TradePlanner() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data) => api.entities.watchlist.create(data),
+    mutationFn: async (data) => {
+      if (!user) throw new Error('Not authenticated');
+      const client = await createClerkSupabaseClient(getToken);
+      const payload = { ...data, user_id: user.id };
+      return api.entities.watchlist.create(payload, client);
+    },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['watchlist'] }); setShowForm(false); },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => api.entities.watchlist.update(id, data),
+    mutationFn: async ({ id, data }) => {
+      if (!user) throw new Error('Not authenticated');
+      const client = await createClerkSupabaseClient(getToken);
+      // Ensure payload contains id when updating
+      const payload = { id, ...data };
+      return api.entities.watchlist.update(id, payload, client);
+    },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['watchlist'] }); setShowForm(false); setEditingItem(null); },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => api.entities.watchlist.delete(id),
+    mutationFn: async (id) => {
+      if (!user) throw new Error('Not authenticated');
+      const client = await createClerkSupabaseClient(getToken);
+      return api.entities.watchlist.delete(id, client);
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['watchlist'] }),
   });
 

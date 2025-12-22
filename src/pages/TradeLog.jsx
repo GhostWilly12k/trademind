@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { api } from "@/api/supabaseClient";
+import { api, createClerkSupabaseClient } from "@/api/supabaseClient";
+import { useUser, useAuth } from "@clerk/clerk-react";
 
 import TradeForm from "../components/tradelog/TradeForm";
 import TradeCard from "../components/tradelog/TradeCard";
@@ -13,13 +14,25 @@ export default function TradeLog() {
   const [editingTrade, setEditingTrade] = useState(null);
   const queryClient = useQueryClient();
 
+  const { user } = useUser();
+  const { getToken } = useAuth();
+
   const { data: trades = [], isLoading } = useQuery({
     queryKey: ['trades'],
-    queryFn: () => api.entities.trade.list(),
+    queryFn: async () => {
+      if (!user) return [];
+      const client = await createClerkSupabaseClient(getToken);
+      return api.entities.trade.list(client);
+    },
   });
 
   const createTradeMutation = useMutation({
-    mutationFn: (tradeData) => api.entities.trade.create(tradeData),
+    mutationFn: async (tradeData) => {
+      if (!user) throw new Error('Not authenticated');
+      const client = await createClerkSupabaseClient(getToken);
+      const payload = { ...tradeData, user_id: user.id };
+      return api.entities.trade.create(payload, client);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trades'] });
       setShowForm(false);
@@ -27,7 +40,12 @@ export default function TradeLog() {
   });
 
   const updateTradeMutation = useMutation({
-    mutationFn: ({ id, tradeData }) => api.entities.trade.update(id, tradeData),
+    mutationFn: async ({ id, tradeData }) => {
+      if (!user) throw new Error('Not authenticated');
+      const client = await createClerkSupabaseClient(getToken);
+      const payload = { id, ...tradeData };
+      return api.entities.trade.update(id, payload, client);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trades'] });
       setShowForm(false);
@@ -36,7 +54,11 @@ export default function TradeLog() {
   });
 
   const deleteTradeMutation = useMutation({
-    mutationFn: (id) => api.entities.trade.delete(id),
+    mutationFn: async (id) => {
+      if (!user) throw new Error('Not authenticated');
+      const client = await createClerkSupabaseClient(getToken);
+      return api.entities.trade.delete(id, client);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trades'] });
     },
