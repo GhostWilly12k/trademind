@@ -1,5 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import Layout from './layout';
 import Dashboard from './pages/Dashboard';
 import TradeLog from './pages/TradeLog';
 import Analytics from './pages/Analytics';
